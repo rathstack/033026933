@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>XRCMFSx -- AI Data Extractor</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: Arial, sans-serif; background: #f0f2f5; color: #222; font-size: 14px; min-height: 100vh; }
+.app { max-width: 980px; margin: 0 auto; padding: 28px 16px 60px; }
+h1 { font-size: 21px; font-weight: 700; margin-bottom: 4px; }
+.subtitle { color: #666; font-size: 13px; margin-bottom: 20px; }
+.api-box { background: #fff; border: 1px solid #e0e0e0; border-radius: 10px; padding: 16px 20px; margin-bottom: 20px; }
+.api-box label { font-size: 12px; font-weight: 700; color: #444; display: block; margin-bottom: 6px; }
+.api-row { display: flex; gap: 8px; align-items: center; }
+.api-box input { flex: 1; padding: 8px 12px; border: 1px solid #ccc; border-radius: 6px; font-size: 13px; font-family: monospace; color: #333; }
+.api-box input:focus { outline: 2px solid #1A5276; border-color: #1A5276; }
+.api-note { font-size: 11px; color: #999; margin-top: 6px; }
+.api-status { display: inline-block; font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 8px; margin-left: 8px; }
+.api-status.set { background: #e8f6ef; color: #0f6e56; }
+.api-status.unset { background: #fde8e8; color: #a32d2d; }
+.upload-zone { border: 2px dashed #bbb; border-radius: 12px; padding: 48px 24px; text-align: center; background: #fff; cursor: pointer; transition: border-color 0.2s, background 0.2s; }
+.upload-zone:hover, .upload-zone.drag { border-color: #1A5276; background: #eef5fb; }
+.upload-zone input { display: none; }
+.upload-icon { font-size: 36px; margin-bottom: 10px; }
+.upload-zone p { color: #555; font-size: 14px; }
+.upload-zone span.link { color: #1A5276; font-weight: 600; text-decoration: underline; cursor: pointer; }
+.upload-zone .hint { font-size: 12px; color: #999; margin-top: 6px; }
+.status-bar { margin: 14px 0 0; padding: 11px 16px; border-radius: 8px; font-size: 13px; display: none; }
+.status-bar.info    { background: #d6eaf8; color: #1A5276; display: block; }
+.status-bar.error   { background: #fde8e8; color: #a32d2d; display: block; }
+.status-bar.success { background: #e8f6ef; color: #0f6e56; display: block; }
+.progress { height: 5px; background: #e0e0e0; border-radius: 3px; margin: 10px 0 0; overflow: hidden; display: none; }
+.progress-bar { height: 100%; background: #1A5276; border-radius: 3px; width: 0%; transition: width 0.4s; }
+.review-panel { display: none; margin-top: 28px; }
+.review-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; flex-wrap: wrap; gap: 10px; }
+.review-top h2 { font-size: 17px; font-weight: 700; }
+.study-meta { font-size: 12px; color: #888; margin-top: 2px; }
+.section-block { background: #fff; border-radius: 10px; border: 1px solid #e0e0e0; margin-bottom: 14px; overflow: hidden; }
+.sec-head { padding: 10px 16px; font-weight: 700; font-size: 11px; letter-spacing: 0.6px; text-transform: uppercase; color: #fff; display: flex; align-items: center; justify-content: space-between; cursor: pointer; user-select: none; }
+.sec-body.hidden { display: none; }
+.field-row { display: grid; grid-template-columns: 230px 1fr 90px; border-bottom: 1px solid #f2f2f2; }
+.field-row:last-child { border-bottom: none; }
+.fl { padding: 9px 14px; font-size: 12px; color: #555; font-weight: 600; background: #fafafa; border-right: 1px solid #f2f2f2; display: flex; align-items: flex-start; padding-top: 11px; }
+.fl .tag { font-size: 9px; font-weight: 700; color: #aaa; margin-left: 5px; margin-top: 1px; white-space: nowrap; }
+.fv { padding: 9px 12px; font-size: 13px; line-height: 1.5; outline: none; }
+.fv:focus { background: #fffbe6; }
+.fv.empty { color: #bbb; font-style: italic; }
+.fc { padding: 9px 6px; display: flex; align-items: center; justify-content: center; }
+.badge { display: inline-block; padding: 2px 7px; border-radius: 10px; font-size: 10px; font-weight: 700; }
+.hi { background: #e8f6ef; color: #0f6e56; }
+.md { background: #faeeda; color: #854f0b; }
+.lo { background: #fde8e8; color: #a32d2d; }
+.na { background: #f0f0f0; color: #999; }
+.sec-A { background: #2C3E50; } .sec-B { background: #1A5276; } .sec-C { background: #1F618D; }
+.sec-D { background: #117A65; } .sec-E { background: #6E2F8A; } .sec-F { background: #7D6608; }
+.sec-G { background: #784212; } .sec-H { background: #922B21; }
+.paste-panel { display: none; margin-top: 28px; }
+.tabs { display: flex; gap: 6px; margin-bottom: 14px; flex-wrap: wrap; }
+.tab-btn { padding: 8px 18px; border-radius: 6px; border: 1px solid #ccc; background: #fff; cursor: pointer; font-size: 13px; font-weight: 600; color: #555; }
+.tab-btn.active { background: #1A5276; color: #fff; border-color: #1A5276; }
+.tab-btn.dim { color: #aaa; cursor: default; }
+.paste-block { background: #fff; border-radius: 10px; border: 1px solid #e0e0e0; overflow: hidden; margin-bottom: 14px; }
+.paste-head { padding: 10px 16px; font-size: 12px; font-weight: 700; color: #fff; display: flex; justify-content: space-between; align-items: center; }
+.ph-home { background: #2C3E50; } .ph-clin { background: #1A5276; } .ph-edu { background: #117A65; }
+.paste-instructions { padding: 12px 16px; font-size: 13px; color: #444; background: #fffbe6; border-bottom: 1px solid #f0e8c0; line-height: 1.7; }
+.paste-instructions ol { padding-left: 20px; }
+.paste-instructions li { margin-bottom: 3px; }
+.multi-note { font-size: 11px; color: #784212; background: #fef5e7; border: 1px solid #f0d9a0; border-radius: 6px; padding: 8px 12px; margin: 10px 16px; }
+.headers-area { width: 100%; border: none; padding: 10px 14px; font-family: monospace; font-size: 10px; outline: none; color: #999; background: #f7f7f7; min-height: 44px; resize: none; border-bottom: 1px solid #eee; display: block; }
+.tsv-area { width: 100%; border: none; padding: 10px 14px; font-family: monospace; font-size: 11px; resize: vertical; outline: none; color: #222; min-height: 70px; background: #fafafa; display: block; }
+.na-note { padding: 14px 16px; font-size: 13px; color: #888; font-style: italic; }
+.btn { padding: 9px 18px; border-radius: 7px; border: 1px solid #ccc; background: #fff; cursor: pointer; font-size: 13px; font-weight: 600; transition: background 0.15s; }
+.btn:hover { background: #f0f0f0; }
+.btn-primary { background: #1A5276; color: #fff; border-color: #1A5276; }
+.btn-primary:hover { background: #154360; }
+.btn-sm { padding: 5px 12px; font-size: 12px; color: #fff; border-color: rgba(255,255,255,0.4); background: transparent; }
+.btn-sm:hover { background: rgba(255,255,255,0.15); }
+.btn-clear { padding: 7px 12px; font-size: 12px; background: #fde8e8; color: #a32d2d; border-color: #f5c6c6; }
+.btn-clear:hover { background: #fbd0d0; }
+.toast { position: fixed; bottom: 24px; right: 24px; background: #222; color: #fff; padding: 10px 18px; border-radius: 8px; font-size: 13px; opacity: 0; transition: opacity 0.3s; pointer-events: none; z-index: 999; }
+.toast.show { opacity: 1; }
+@media (max-width: 580px) {
+  .field-row { grid-template-columns: 1fr; }
+  .fl { border-right: none; border-bottom: 1px solid #f2f2f2; }
+  .fc { justify-content: flex-start; padding-left: 14px; padding-bottom: 10px; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <h1>XRCMFSx -- AI Data Extractor</h1>
+  <p class="subtitle">Upload a study PDF, review extracted fields, then paste into Google Sheets.</p>
+
+  <div class="api-box">
+    <label>Anthropic API Key <span id="api-status" class="api-status unset">Not set</span></label>
+    <div class="api-row">
+      <input type="password" id="api-key-input" placeholder="Paste your API key here (sk-ant-...)" autocomplete="off" spellcheck="false" oninput="handleKeyInput()">
+      <button class="btn btn-clear" onclick="clearKey()">Clear</button>
+    </div>
+    <p class="api-note">Key stored in memory only. Never saved to disk. Deleted automatically when this tab is closed.</p>
+  </div>
+
+  <div id="step-upload">
+    <div class="upload-zone" id="drop-zone">
+      <input type="file" id="file-input" accept=".pdf">
+      <div class="upload-icon">&#128196;</div>
+      <p><span class="link" onclick="document.getElementById('file-input').click()">Click to upload a PDF</span> or drag and drop</p>
+      <p class="hint">Full-text PDF recommended. Up to 30 pages read.</p>
+    </div>
+    <div class="status-bar" id="status-bar"></div>
+    <div class="progress" id="progress"><div class="progress-bar" id="progress-bar"></div></div>
+  </div>
+
+  <div class="review-panel" id="review-panel">
+    <div class="review-top">
+      <div><h2>Review Extracted Data</h2><div class="study-meta" id="study-meta"></div></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn" onclick="resetApp()">New Study</button>
+        <button class="btn btn-primary" onclick="goToPaste()">Confirm and Get Paste Text</button>
+      </div>
+    </div>
+    <p style="font-size:12px;color:#888;margin-bottom:14px;">All fields are editable. Confidence badges indicate AI certainty. Always verify Low-confidence fields. MULTI fields show comma-separated values for manual chip entry.</p>
+    <div id="review-sections"></div>
+    <div style="margin-top:16px;text-align:right;">
+      <button class="btn btn-primary" onclick="goToPaste()">Confirm and Get Paste Text</button>
+    </div>
+  </div>
+
+  <div class="paste-panel" id="paste-panel">
+    <div class="review-top">
+      <div><h2>Paste into Google Sheets</h2><div class="study-meta" id="paste-meta"></div></div>
+      <div style="display:flex;gap:8px;">
+        <button class="btn" onclick="goToReview()">Edit Fields</button>
+        <button class="btn" onclick="resetApp()">New Study</button>
+      </div>
+    </div>
+    <div class="tabs">
+      <button class="tab-btn active" id="tab-home" onclick="switchTab('home')">Home Sheet</button>
+      <button class="tab-btn" id="tab-clin" onclick="switchTab('clin')">Clinical Outcomes</button>
+      <button class="tab-btn" id="tab-edu" onclick="switchTab('edu')">Education Outcomes</button>
+    </div>
+    <div id="pane-home"></div>
+    <div id="pane-clin" style="display:none;"></div>
+    <div id="pane-edu" style="display:none;"></div>
+  </div>
+</div>
+<div class="toast" id="toast">Copied!</div>
+
+<script>
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+let SESSION_API_KEY = '';
+
+function handleKeyInput() {
+  const val = document.getElementById('api-key-input').value.trim();
+  SESSION_API_KEY = val;
+  const s = document.getElementById('api-status');
+  if(val.startsWith('sk-ant-') && val.length > 20) { s.textContent = 'Set'; s.className = 'api-status set'; }
+  else { s.textContent = val.length > 0 ? 'Invalid format' : 'Not set'; s.className = 'api-status unset'; }
+}
+
+function clearKey() {
+  SESSION_API_KEY = '';
+  document.getElementById('api-key-input').value = '';
+  const s = document.getElementById('api-status');
+  s.textContent = 'Not set'; s.className = 'api-status unset';
+}
+
+window.addEventListener('beforeunload', () => { SESSION_API_KEY = ''; });
+
+// m:true = multi-select, comma-separated free text (no sheet validation)
+// opts = guidance for AI only
+const HOME_FIELDS = [
+  // Section A
+  { key:'study_id',         label:'Study ID',                                          sec:'A', auto:true },
+  { key:'reviewer',         label:'Reviewer',                                          sec:'A', fixed:'Rahul' },
+  { key:'date_extracted',   label:'Date Extracted',                                    sec:'A', auto:true },
+  { key:'extraction_status',label:'Extraction Status',                                 sec:'A', opts:['Yes','In Progress','Flagged for Discussion'] },
+  // Section B
+  { key:'first_author',     label:'First Author',                                      sec:'B' },
+  { key:'year',             label:'Year',                                              sec:'B' },
+  { key:'title',            label:'Title',                                             sec:'B' },
+  { key:'journal',          label:'Journal / Venue',                                   sec:'B' },
+  { key:'pub_type',         label:'Publication Type',                                  sec:'B', opts:['Journal Article','Conference Abstract','Thesis','Preprint','Trial Registry','Other Grey Literature'] },
+  { key:'country',          label:'Country / Region',                                  sec:'B' },
+  { key:'doi',              label:'DOI / URL',                                         sec:'B' },
+  // Section C
+  { key:'study_design',     label:'Study Design',                                      sec:'C', opts:['RCT','Non-Randomized Trial','Prospective Cohort','Retrospective Cohort','Cross-Sectional','Case Series','Case Report','Qualitative','Mixed Methods','Technical Validation','Feasibility/Pilot','Other'] },
+  { key:'prosp_retro',      label:'Prospective / Retrospective',                       sec:'C', opts:['Prospective','Retrospective','Not Applicable','Not Reported'] },
+  { key:'comparator',       label:'Comparator',                                        sec:'C', opts:['Active Control','Historical Control','Within-Subject Control','No Comparator','Not Reported'] },
+  { key:'comparator_desc',  label:'Comparator Description',                            sec:'C' },
+  { key:'users_n',          label:'Users (N)',                                         sec:'C' },
+  { key:'patients_n',       label:'Patients (N)',                                      sec:'C' },
+  { key:'followup',         label:'Follow-Up Duration',                                sec:'C', opts:['None / Single Session','<1 Month','1-3 Months','3-6 Months','>6 Months','Not Reported'] },
+  // Section D
+  { key:'study_type',       label:'Study Type',                                        sec:'D', opts:['Clinical','Education/Training','Both'] },
+  { key:'primary_user',     label:'Primary User',                                      sec:'D', m:true, opts:['Patient','Surgeon','Surgical Team','Trainee'] },
+  { key:'cmf_domain',       label:'CMF Domain',                                        sec:'D', m:true, opts:['Oncologic','Reconstructive','Congenital','Traumatic','Orthognathic','Aesthetic'] },
+  { key:'procedures',       label:'Procedure(s) Studied',                              sec:'D' },
+  { key:'pt_pop',           label:'Patient Population Described',                      sec:'D', opts:['Yes','No','Not Applicable'] },
+  { key:'pt_age',           label:'Patient Age (Mean or Range)',                       sec:'D' },
+  { key:'pt_sex',           label:'Patient Sex Distribution',                          sec:'D' },
+  { key:'clinician_level',  label:'Clinician / Trainee Level',                         sec:'D', m:true, opts:['Medical Student','Resident','Fellow','Staff'] },
+  { key:'setting',          label:'Clinical Setting',                                  sec:'D', m:true, opts:['Operating Room','Clinic/Outpatient','Inpatient','Simulation Center','Home/Remote'] },
+  { key:'incl_criteria',    label:'Inclusion Criteria',                                sec:'D' },
+  { key:'excl_criteria',    label:'Exclusion Criteria',                                sec:'D' },
+  // Section E
+  { key:'xr_modality',      label:'XR Modality',                                       sec:'E', m:true, opts:['VR','AR','MR'] },
+  { key:'immersive',        label:'Immersive vs Non-Immersive',                        sec:'E', opts:['Fully Immersive','Semi-Immersive','Non-Immersive','Not Reported'] },
+  { key:'hw_category',      label:'Hardware Category',                                 sec:'E', m:true, opts:['Head-Mounted Display (HMD)','Tablet/Phone','Projection System','Desktop/Monitor-Based'] },
+  { key:'device',           label:'Device Brand / Model',                              sec:'E', m:true, opts:['HoloLens 1','HoloLens 2','Meta Quest 2','Meta Quest 3','Oculus Rift/Rift S','HTC Vive/Vive Pro','Varjo','Magic Leap 1','Magic Leap 2','iPad/Tablet (unspecified)','iPhone (unspecified)','zSpace'] },
+  { key:'device_details',   label:'Device Details (if Other)',                         sec:'E' },
+  { key:'med_grade',        label:'Medical-Grade vs Consumer',                         sec:'E', opts:['Medical-Grade','Consumer-Grade','Research Prototype','Not Reported'] },
+  // Section F
+  { key:'software',         label:'Software / Platform',                               sec:'F' },
+  { key:'cust_comm',        label:'Custom vs Commercial Software',                     sec:'F', opts:['Custom-Built','Commercial Off-the-Shelf','Modified Commercial','Not Reported'] },
+  { key:'data_source',      label:'Data Source for XR Content',                        sec:'F', m:true, opts:['CT','MRI','CTA','3D Surface Scan','Photography','CAD/3D Model','Endoscopy/Video'] },
+  { key:'segmentation',     label:'Segmentation Pipeline Described',                   sec:'F', opts:['Yes','Partial','No','Not Applicable'] },
+  { key:'registration',     label:'Registration Method (AR/MR)',                       sec:'F', opts:['Marker-Based','Markerless/Surface','Manual','Not Applicable','Not Reported'] },
+  { key:'tracking',         label:'Tracking Method',                                   sec:'F', m:true, opts:['Optical','Electromagnetic','IMU/Gyroscope'] },
+  { key:'section_f_notes',  label:'Section F: Notes',                                  sec:'F' },
+  // Section G
+  { key:'phase',            label:'Perioperative Phase',                               sec:'G', m:true, opts:['Planning','Pre-Operative','Intra-Operative','Post-Operative','Training/Education'] },
+  { key:'purpose',          label:'XR Application Purpose',                            sec:'G', m:true, opts:['Patient Education/Consent','Anxiety/Pain Management','Surgical Planning','Intra-Op Navigation/Guidance','Workflow Visualization','Simulation Training','Telementoring','Competency Assessment'] },
+  { key:'duration',         label:'Intervention Duration (per session)',                sec:'G', opts:['<5 min','5-15 min','15-30 min','30-60 min','>60 min','Not Reported'] },
+  { key:'sessions',         label:'Number of Sessions',                                sec:'G', opts:['Single Session','2-5 Sessions','6-10 Sessions','>10 Sessions','Variable','Not Reported'] },
+  { key:'workflow_int',     label:'Workflow Integration Described',                     sec:'G', opts:['Yes','Partial','No'] },
+  { key:'telementoring',    label:'Telementoring Component',                           sec:'G', opts:['Yes','No','Not Reported'] },
+  { key:'section_g_notes',  label:'Section G: Notes',                                  sec:'G' },
+  // Section H
+  { key:'pt_outcomes_rep',  label:'Patient-Facing Outcomes Reported',                  sec:'H', opts:['Yes','No'] },
+  { key:'proc_outcomes_rep',label:'Process/Clinical Outcomes Reported',                sec:'H', opts:['Yes','No'] },
+  { key:'usab_outcomes_rep',label:'Usability/Feasibility Outcomes Reported',           sec:'H', opts:['Yes','No'] },
+  { key:'quant_results',    label:'Key Quantitative Results',                          sec:'H' },
+  { key:'qual_summary',     label:'Qualitative Summary of Findings',                   sec:'H' },
+  { key:'limitations',      label:'Author-Reported Limitations',                       sec:'H' },
+  { key:'barriers',         label:'Implementation Barriers',                           sec:'H' },
+  { key:'facilitators',     label:'Implementation Facilitators',                       sec:'H' },
+  { key:'evidence_gaps',    label:'Evidence Gaps (Author-Noted)',                      sec:'H' },
+  { key:'reviewer_notes',   label:'Reviewer Notes / Flags',                            sec:'H' },
+];
+
+const CLIN_FIELDS = [
+  { key:'c_anxiety',        label:'Anxiety Measured',                          opts:['Yes','No','Not Reported'] },
+  { key:'c_anxiety_inst',   label:'Anxiety Instrument',                        opts:['VAS','STAI','APAIS','NRS','Other','Not Reported'] },
+  { key:'c_anxiety_dir',    label:'Anxiety Result Direction',                  opts:['Favors XR','No Difference','Favors Control','Not Reported'] },
+  { key:'c_pain',           label:'Pain Measured',                             opts:['Yes','No','Not Reported'] },
+  { key:'c_pain_inst',      label:'Pain Instrument',                           opts:['VAS','NRS','Wong-Baker','Other','Not Reported'] },
+  { key:'c_pain_dir',       label:'Pain Result Direction',                     opts:['Favors XR','No Difference','Favors Control','Not Reported'] },
+  { key:'c_satisfaction',   label:'Patient Satisfaction Measured',             opts:['Yes','No','Not Reported'] },
+  { key:'c_satisf_inst',    label:'Satisfaction Instrument',                   opts:['Likert Scale','Custom Questionnaire','FACE-Q','Other','Not Reported'] },
+  { key:'c_knowledge',      label:'Patient Knowledge/Understanding Measured',  opts:['Yes','No','Not Reported'] },
+  { key:'c_decision',       label:'Decisional Conflict Measured',              opts:['Yes','No','Not Reported'] },
+  { key:'c_decision_inst',  label:'Decisional Conflict Instrument',            opts:['DCS','Custom','Other','Not Reported'] },
+  { key:'c_cybersick',      label:'Adverse Effects / Cybersickness Reported',  opts:['Yes','No','Not Reported'] },
+  { key:'c_cybersick_inst', label:'Cybersickness Instrument',                  opts:['SSQ','FMS','Custom','Not Reported'] },
+  { key:'c_proms',          label:'PROMs Used',                                m:true, opts:['FACE-Q','SF-36','PROMIS'] },
+  { key:'c_pt_results',     label:'Patient Outcome: Key Results' },
+  { key:'c_accuracy',       label:'Accuracy / Precision Measured',             opts:['Yes','No','Not Reported'] },
+  { key:'c_accuracy_metric',label:'Accuracy Metric' },
+  { key:'c_op_time',        label:'Operative Time Measured',                   opts:['Yes','No','Not Reported'] },
+  { key:'c_op_time_dir',    label:'Operative Time Result Direction',           opts:['Favors XR','No Difference','Favors Control','Not Reported'] },
+  { key:'c_complications',  label:'Complications / Revisions Reported',        opts:['Yes','No','Not Reported'] },
+  { key:'c_proc_results',   label:'Process Outcome: Key Results' },
+  { key:'c_usability',      label:'Usability Measured',                        opts:['Yes','No','Not Reported'] },
+  { key:'c_usab_inst',      label:'Usability Instrument',                      opts:['SUS','Custom Questionnaire','Other','Not Reported'] },
+  { key:'c_workload',       label:'Workload Measured',                         opts:['Yes','No','Not Reported'] },
+  { key:'c_workload_inst',  label:'Workload Instrument',                       opts:['NASA-TLX','Other','Not Reported'] },
+  { key:'c_feasibility',    label:'Feasibility Conclusion',                    opts:['Feasible','Partially Feasible','Not Feasible','Not Reported'] },
+  { key:'c_cost',           label:'Cost / Resource Analysis Included',         opts:['Yes','No'] },
+  { key:'c_usab_results',   label:'Usability / Feasibility: Key Results' },
+];
+
+const EDU_FIELDS = [
+  { key:'e_sim_type',      label:'XR Simulation Type',                          opts:['Procedural Trainer','Anatomical Visualization','Full Scenario','Telementoring','Assessment Tool','Other'] },
+  { key:'e_trainee_level', label:'Trainee Level Assessed',                      m:true, opts:['Medical Student','Resident','Fellow','Staff'] },
+  { key:'e_learning_out',  label:'Learning Outcomes Assessed',                  m:true, opts:['Technical Skill','Anatomical Knowledge','Decision-Making','Communication'] },
+  { key:'e_assessment',    label:'Assessment Method',                           m:true, opts:['OSATS/Global Rating Scale','Task-Specific Checklist','Written/MCQ Test','Self-Assessment','Expert Observation'] },
+  { key:'e_validity',      label:'Validity Evidence Type',                      m:true, opts:['Content Validity','Face Validity','Construct Validity','Criterion Validity','Concurrent Validity'] },
+  { key:'e_transfer',      label:'Transfer to OR / Clinical Setting Assessed',  opts:['Yes','No','Not Reported'] },
+  { key:'e_comparison',    label:'Comparison Group',                            opts:['XR vs Traditional Teaching','XR vs Cadaver','XR vs Phantom/Mannequin','Within-Group Pre/Post','No Comparison','Other'] },
+  { key:'e_perf_dir',      label:'Performance Result Direction',                opts:['Favors XR','No Difference','Mixed','Not Reported'] },
+  { key:'e_quant',         label:'Key Quantitative Results (Education)' },
+  { key:'e_qual',          label:'Qualitative Summary (Education)' },
+];
+
+const SEC_LABELS = {
+  A:'Study Administration', B:'Bibliographic Details', C:'Study Design and Methods',
+  D:'Population and Participants', E:'XR Technology', F:'Software and Data Inputs',
+  G:'Use-Case and Intervention', H:'Outcomes and Findings'
+};
+
+let data = {};
+
+const dz = document.getElementById('drop-zone');
+const fi = document.getElementById('file-input');
+dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag'); });
+dz.addEventListener('dragleave', () => dz.classList.remove('drag'));
+dz.addEventListener('drop', e => { e.preventDefault(); dz.classList.remove('drag'); if(e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]); });
+fi.addEventListener('change', e => { if(e.target.files[0]) handleFile(e.target.files[0]); });
+
+function setStatus(msg, type) { const el = document.getElementById('status-bar'); el.textContent = msg; el.className = 'status-bar ' + type; }
+function setProgress(p) { const pr = document.getElementById('progress'); pr.style.display = p > 0 ? 'block' : 'none'; document.getElementById('progress-bar').style.width = p + '%'; }
+
+async function handleFile(file) {
+  if(!SESSION_API_KEY || !SESSION_API_KEY.startsWith('sk-ant-')) { setStatus('Please enter a valid Anthropic API key above before uploading.', 'error'); return; }
+  if(!file.name.endsWith('.pdf')) { setStatus('Please upload a PDF file.', 'error'); return; }
+  setStatus('Reading PDF...', 'info'); setProgress(15);
+  try {
+    const text = await extractPDF(file);
+    setStatus('Extracting data with AI. This takes approximately 20 seconds.', 'info'); setProgress(40);
+    await runExtraction(text);
+  } catch(e) { setStatus('Error: ' + e.message, 'error'); setProgress(0); console.error(e); }
+}
+
+async function extractPDF(file) {
+  const ab = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data: ab }).promise;
+  let txt = '';
+  const max = Math.min(pdf.numPages, 30);
+  for(let i = 1; i <= max; i++) {
+    const pg = await pdf.getPage(i);
+    const ct = await pg.getTextContent();
+    txt += ct.items.map(s => s.str).join(' ') + '\n';
+  }
+  return txt.slice(0, 20000);
+}
+
+async function runExtraction(text) {
+  const today = new Date().toISOString().split('T')[0];
+  const extractFields = [
+    ...HOME_FIELDS.filter(f => !f.auto && !f.fixed && f.key !== 'reviewer_notes'),
+    ...CLIN_FIELDS,
+    ...EDU_FIELDS
+  ];
+
+  const fieldList = extractFields.map(f => {
+    let desc = '';
+    if(f.m && f.opts) {
+      desc = ` [MULTI-SELECT: return comma-separated values from: ${f.opts.join(', ')}. If a value applies but is not listed, create a short consistent label. Use "Not Reported" only if truly absent.]`;
+    } else if(f.opts) {
+      desc = ` [single value, must be exactly one of: ${f.opts.join(' | ')}]`;
+    } else {
+      desc = ' [free text]';
+    }
+    return `"${f.key}": ${f.label}${desc}`;
+  }).join('\n');
+
+  const prompt = `You are a systematic review data extractor for a scoping review on Extended Reality (XR) in craniomaxillofacial (CMF) surgery.
+
+Extract data from the study text and return ONLY a valid JSON object.
+
+STRICT RULES:
+1. Single-select fields: return exactly one listed option, character-perfect. No paraphrasing.
+2. Multi-select fields: return comma-separated applicable values (e.g. "Resident, Staff"). Use listed values where possible. If a value clearly applies but is not listed, create a short consistent label. Use "Not Reported" only if truly absent.
+3. Free text fields: factual, succinct, scientific. No em dashes. Short declarative sentences. Do not fabricate or infer beyond what is stated in the paper.
+4. If information is not in the paper: use "Not Reported" for all field types. Free text fields may use "" if nothing at all applies.
+5. Device Brand/Model: identify from context. If described but not named, create a short descriptive label (e.g. "Custom AR HMD"). Do not leave blank.
+6. Patient Age: number or range only (e.g. "52" or "34-67"). No units.
+7. Users (N): number of clinicians, trainees, or users. Patients (N): number of patients. If total N only and roles unclear, put total in Users (N) and leave Patients (N) as "Not Reported".
+8. study_type: "Clinical" = patient care or clinical workflow; "Education/Training" = simulation or training; "Both" = addresses both.
+9. c_* fields: extract only if study_type is Clinical or Both. Otherwise return "Not Reported" or "".
+10. e_* fields: extract only if study_type is Education/Training or Both. Otherwise return "Not Reported" or "".
+11. section_f_notes: elaborate on segmentation pipeline, registration method, tracking, and any other relevant technical implementation detail.
+12. section_g_notes: elaborate on workflow integration, telementoring setup, session structure, and any other relevant intervention detail.
+13. For every field add a companion key with suffix "_conf" set to "high", "medium", or "low" based on how clearly the paper supports the answer.
+
+FIELDS:
+${fieldList}
+
+STUDY TEXT:
+${text}
+
+Return ONLY the JSON object. No markdown fences, no explanation, no preamble.`;
+
+  const resp = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': SESSION_API_KEY,
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true'
+    },
+    body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 4000, messages: [{ role: 'user', content: prompt }] })
+  });
+
+  if(!resp.ok) {
+    const err = await resp.json().catch(() => ({}));
+    throw new Error(err.error?.message || 'API error ' + resp.status);
+  }
+
+  const json = await resp.json();
+  const raw = json.content[0].text.trim().replace(/```json|```/g, '').trim();
+  data = JSON.parse(raw);
+
+  data.reviewer        = 'Rahul';
+  data.date_extracted  = today;
+  data.extraction_status = 'In Progress';
+  data.reviewer_notes  = '';
+  data.study_id        = '';
+
+  setProgress(100);
+  setStatus('Extraction complete. Review all fields below, then click Confirm.', 'success');
+  renderReview();
+}
+
+function renderReview() {
+  const container = document.getElementById('review-sections');
+  container.innerHTML = '';
+  const grouped = {};
+  HOME_FIELDS.forEach(f => { if(!grouped[f.sec]) grouped[f.sec] = []; grouped[f.sec].push(f); });
+
+  Object.keys(grouped).forEach(sec => {
+    const block = document.createElement('div');
+    block.className = 'section-block';
+    const head = document.createElement('div');
+    head.className = `sec-head sec-${sec}`;
+    head.innerHTML = `<span>Section ${sec}: ${SEC_LABELS[sec]}</span><span class="arrow">&#9660;</span>`;
+    const body = document.createElement('div');
+    body.className = 'sec-body';
+    head.onclick = () => { const c = body.classList.toggle('hidden'); head.querySelector('.arrow').style.transform = c ? 'rotate(-90deg)' : ''; };
+    block.appendChild(head);
+    grouped[sec].forEach(f => body.appendChild(makeRow(f, '#fafafa')));
+
+    if(sec === 'H') {
+      const st = (data.study_type || '').toLowerCase();
+      if(st.includes('clinical') || st.includes('both')) {
+        body.appendChild(subHeader('Clinical Outcome Fields', '#eef5fb', '#1A5276'));
+        CLIN_FIELDS.forEach(f => body.appendChild(makeRow(f, '#eef5fb')));
+      }
+      if(st.includes('education') || st.includes('both')) {
+        body.appendChild(subHeader('Education Outcome Fields', '#e8f6ef', '#117A65'));
+        EDU_FIELDS.forEach(f => body.appendChild(makeRow(f, '#e8f6ef')));
+      }
+    }
+    block.appendChild(body);
+    container.appendChild(block);
+  });
+
+  const title = data.title || 'Study';
+  document.getElementById('study-meta').textContent = `${data.first_author || ''} ${data.year || ''} -- ${title.length > 80 ? title.slice(0,80)+'...' : title}`;
+  document.getElementById('step-upload').style.display = 'none';
+  document.getElementById('review-panel').style.display = 'block';
+}
+
+function makeRow(f, bg) {
+  const val = data[f.key] !== undefined ? data[f.key] : '';
+  const conf = data[f.key + '_conf'] || (f.auto || f.fixed ? 'na' : 'medium');
+  const row = document.createElement('div');
+  row.className = 'field-row';
+  const badgeCls = conf==='high'?'hi':conf==='low'?'lo':conf==='na'?'na':'md';
+  const badgeTxt = conf==='na'?'--':conf.charAt(0).toUpperCase()+conf.slice(1);
+  const isEmpty = !val;
+  const typeTag = f.m ? '<span class="tag">MULTI</span>' : (f.opts ? '<span class="tag">LIST</span>' : '');
+  row.innerHTML = `
+    <div class="fl" style="background:${bg};">${f.label}${typeTag}</div>
+    <div class="fv${isEmpty?' empty':''}" contenteditable="true" data-key="${f.key}" onblur="updateVal('${f.key}',this)">${isEmpty ? 'Not reported' : esc(String(val))}</div>
+    <div class="fc"><span class="badge ${badgeCls}">${badgeTxt}</span></div>`;
+  return row;
+}
+
+function subHeader(label, bg, color) {
+  const d = document.createElement('div');
+  d.style.cssText = `padding:7px 14px;font-size:11px;font-weight:700;color:${color};background:${bg};border-top:1px solid ${bg === '#eef5fb' ? '#d6eaf8' : '#b7e4d4'};letter-spacing:0.4px;text-transform:uppercase;`;
+  d.textContent = label;
+  return d;
+}
+
+function updateVal(key, el) {
+  const v = el.textContent.trim();
+  data[key] = v === 'Not reported' ? '' : v;
+  el.classList.toggle('empty', !data[key]);
+}
+
+function goToReview() {
+  document.getElementById('paste-panel').style.display = 'none';
+  document.getElementById('review-panel').style.display = 'block';
+}
+
+function goToPaste() {
+  buildPaste();
+  document.getElementById('review-panel').style.display = 'none';
+  document.getElementById('paste-panel').style.display = 'block';
+  document.getElementById('paste-meta').textContent = document.getElementById('study-meta').textContent;
+  switchTab('home');
+}
+
+function buildPaste() {
+  const st = (data.study_type || '').toLowerCase();
+  const hasClin = st.includes('clinical') || st.includes('both');
+  const hasEdu  = st.includes('education') || st.includes('both');
+
+  const multiNote = `<div class="multi-note">Columns marked [MULTI] contain comma-separated values. After pasting, enter these manually into the corresponding chip-mode cells in Google Sheets.</div>`;
+
+  const homeH = HOME_FIELDS.map(f => f.label + (f.m ? ' [MULTI]' : '')).join('\t');
+  const homeV = HOME_FIELDS.map(f => clean(data[f.key] || '')).join('\t');
+  document.getElementById('pane-home').innerHTML = pasteBlock('ph-home', 'Home Sheet', homeH, homeV, 'tsv-home', multiNote +
+    `<ol>
+      <li>Open your <strong>Home</strong> sheet in Google Sheets</li>
+      <li>Click the first empty cell in <strong>column A</strong> of a new row</li>
+      <li>Paste with <strong>Ctrl+Shift+V</strong> (paste values only)</li>
+      <li>For MULTI columns, enter the comma-separated values manually into the chip cells</li>
+    </ol>`);
+
+  if(hasClin) {
+    const clinH = CLIN_FIELDS.map(f => f.label + (f.m ? ' [MULTI]' : '')).join('\t');
+    const clinV = CLIN_FIELDS.map(f => clean(data[f.key] || '')).join('\t');
+    document.getElementById('pane-clin').innerHTML = pasteBlock('ph-clin', 'Clinical Outcomes', clinH, clinV, 'tsv-clin',
+      `<ol>
+        <li>Open your <strong>Clinical Outcomes</strong> sheet</li>
+        <li>Find the row for this study and click <strong>column I</strong></li>
+        <li>Paste with <strong>Ctrl+Shift+V</strong></li>
+      </ol>`);
+  } else {
+    document.getElementById('pane-clin').innerHTML = `<div class="paste-block"><div class="paste-head ph-clin"><span>Clinical Outcomes</span></div><p class="na-note">Tagged as Education/Training only. No Clinical Outcomes row needed.</p></div>`;
+  }
+
+  if(hasEdu) {
+    const eduH = EDU_FIELDS.map(f => f.label + (f.m ? ' [MULTI]' : '')).join('\t');
+    const eduV = EDU_FIELDS.map(f => clean(data[f.key] || '')).join('\t');
+    document.getElementById('pane-edu').innerHTML = pasteBlock('ph-edu', 'Education Outcomes', eduH, eduV, 'tsv-edu',
+      `<ol>
+        <li>Open your <strong>Education Outcomes</strong> sheet</li>
+        <li>Find the row for this study and click <strong>column H</strong></li>
+        <li>Paste with <strong>Ctrl+Shift+V</strong></li>
+      </ol>`);
+  } else {
+    document.getElementById('pane-edu').innerHTML = `<div class="paste-block"><div class="paste-head ph-edu"><span>Education Outcomes</span></div><p class="na-note">Tagged as Clinical only. No Education Outcomes row needed.</p></div>`;
+  }
+
+  document.getElementById('tab-clin').className = 'tab-btn' + (hasClin ? '' : ' dim');
+  document.getElementById('tab-edu').className  = 'tab-btn' + (hasEdu  ? '' : ' dim');
+}
+
+function pasteBlock(headCls, title, headers, values, id, instructions) {
+  return `<div class="paste-block">
+    <div class="paste-head ${headCls}"><span>${title}</span><button class="btn btn-sm" onclick="copyId('${id}')">Copy row</button></div>
+    <div class="paste-instructions">${instructions}</div>
+    <textarea class="headers-area" readonly>${headers}</textarea>
+    <textarea class="tsv-area" id="${id}" readonly>${values}</textarea>
+  </div>`;
+}
+
+function switchTab(tab) {
+  ['home','clin','edu'].forEach(t => {
+    document.getElementById('pane-'+t).style.display = t===tab ? 'block' : 'none';
+    document.getElementById('tab-'+t).classList.toggle('active', t===tab);
+  });
+}
+
+function copyId(id) {
+  const el = document.getElementById(id);
+  if(!el) return;
+  navigator.clipboard.writeText(el.value).then(() => showToast('Row copied!'));
+}
+
+function showToast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 2000);
+}
+
+function resetApp() {
+  data = {};
+  ['review-panel','paste-panel'].forEach(id => document.getElementById(id).style.display = 'none');
+  document.getElementById('step-upload').style.display = 'block';
+  document.getElementById('status-bar').className = 'status-bar';
+  document.getElementById('file-input').value = '';
+  setProgress(0);
+}
+
+function clean(v) { return String(v).replace(/\t/g,' ').replace(/\n/g,' '); }
+function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+</script>
+</body>
+</html>
